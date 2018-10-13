@@ -5,7 +5,7 @@ echo "Use 'simulate -run' to skip compilation stage."
 echo "Use 'simulate -view' to show previous simulation results."
 echo "---------------------------------------------------------"
 
-name=antic
+name=atari800xl
 
 
 
@@ -25,13 +25,29 @@ if [ ! -e $name.wdb -o "$1" != "-view" ]; then
         rm -f $name.exe
 
         # copy testbench files
-        cp -p ../tb_antic/* .
+        cp -p ../tb_atari800xl/* .
 
         # copy source files
-	cp `find ../a8core/ -iname "*.vhd"` .
-	cp `find ../a8core/ -iname "*.vhdl"` .
-	cp `find ../components/ -iname "*.vhd"` .
-	cp `find ../components/ -iname "*.vhdl"` .
+	cp ../a8core/atari800xl.vhd .
+	cp ../a8core/pokey*.vhdl .
+	cp ../a8core/antic*.vhdl .
+	cp ../a8core/gtia*.vhdl .
+	cp ../a8core/pia.vhdl .
+	cp ../a8core/cpu* .
+	cp ../a8core/mmu.vhdl .
+	cp ../a8core/irq_glue.vhdl .
+	cp ../a8core/internalromram_simple.vhd .
+	cp ../a8core/os16.vhdl .
+	cp ../a8core/basic.vhdl .
+	cp ../a8core/wide_delay_line.vhdl . #component?
+	cp ../a8core/simple_counter.vhdl .  #component?
+	cp ../a8core/reg_file.vhdl .        #component?
+	cp ../components/mult_infer.vhdl .
+	cp ../components/generic_ram_infer.vhdl .
+	cp ../components/complete_address_decoder.vhdl .
+	cp ../components/delay_line.vhdl .
+	cp ../components/synchronizer.vhdl .
+	cp ../components/syncreset_enable_divider.vhd .
 
         # set up project definition file
 	ls *.vhd* | perl -e 'while (<>){s/(.*)/vhdl work $1/;print $_;}' | cat > $name.prj
