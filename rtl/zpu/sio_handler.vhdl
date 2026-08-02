@@ -40,6 +40,10 @@ PORT
 	SIO_COMMAND : in std_logic;
 	SIO_DATA_OUT : in std_logic;
 	SIO_CLK_OUT : in std_logic;
+
+        -- FIFO empty flags, for IRQ on tonnere
+	FIFO_RX_EMPTY : out std_logic;
+	FIFO_TX_EMPTY : out std_logic;
 	
 	-- CPU interface
 	DATA_OUT : OUT STD_LOGIC_VECTOR(15 DOWNTO 0)
@@ -69,14 +73,14 @@ ARCHITECTURE vhdl OF sio_handler IS
 	
 	signal fifo_tx_write : std_logic;	
 	signal fifo_tx_full : std_logic;
-	signal fifo_tx_empty : std_logic;	
+	signal fifo_tx_empty_int : std_logic;	
 	signal fifo_tx_advance : std_logic;
 	signal fifo_tx_data : std_logic_vector(7 downto 0);	
 	signal fifo_tx_count : std_logic_vector(7 downto 0);
 	
 	signal fifo_rx_data : std_logic_vector(14 downto 0);
 	signal fifo_rx_full : std_logic;
-	signal fifo_rx_empty : std_logic;	
+	signal fifo_rx_empty_int : std_logic;	
 	signal fifo_rx_advance : std_logic;
 	signal fifo_rx_count : std_logic_vector(7 downto 0);
 
@@ -241,7 +245,7 @@ begin
 	end process;
 	
 	-- Read from registers
-	process(en,addr_decoded, fifo_rx_data, fifo_tx_full, fifo_tx_empty, fifo_tx_count, fifo_rx_full, fifo_rx_empty, fifo_rx_count, s2p_framing_error_reg, sio_command_framing_error_reg, receive_divisor_reg)
+	process(en,addr_decoded, fifo_rx_data, fifo_tx_full, fifo_tx_empty_int, fifo_tx_count, fifo_rx_full, fifo_rx_empty_int, fifo_rx_count, s2p_framing_error_reg, sio_command_framing_error_reg, receive_divisor_reg)
 	begin
 		data_out_next <= X"0000";
 		fifo_rx_advance <= '0';
@@ -249,16 +253,16 @@ begin
 
 		if (en = '1') then
 			if (addr_decoded(1) = '1') then
-				data_out_next(9 downto 0) <= fifo_tx_full&fifo_tx_empty&fifo_tx_count;
+				data_out_next(9 downto 0) <= fifo_tx_full&fifo_tx_empty_int&fifo_tx_count;
 			end if;
 			if (addr_decoded(2) = '1') then
-				if fifo_rx_empty = '0' then
+				if fifo_rx_empty_int = '0' then
 					data_out_next(14 downto 0) <= fifo_rx_data; -- assumed to be already valid
 					fifo_rx_advance <= '1'; -- data read, next byte please
 				end if;
 			end if;
 			if (addr_decoded(3) = '1') then
-				data_out_next(9 downto 0) <= fifo_rx_full&fifo_rx_empty&fifo_rx_count;
+				data_out_next(9 downto 0) <= fifo_rx_full&fifo_rx_empty_int&fifo_rx_count;
 			end if;
 			if (addr_decoded(4) = '1') then
 				data_out_next(7 downto 0) <= receive_divisor_reg;
@@ -330,7 +334,7 @@ begin
 --		DataIn => cpu_data_in(7 downto 0),
 --		ReadEn => fifo_tx_advance,
 --		DataOut => fifo_tx_data,
---		Empty => fifo_tx_empty,
+--		Empty => fifo_tx_empty_int,
 --		Full => fifo_tx_full
 --	);
 
@@ -342,14 +346,14 @@ transmit_fifo : work.fifo_transmit
 		data		=> cpu_data_in(7 downto 0),
 		rdreq		=> fifo_tx_advance,
 		wrreq		=> fifo_tx_write,
-		empty		=> fifo_tx_empty,
+		empty		=> fifo_tx_empty_int,
 		full		=> fifo_tx_full,
 		q		=> fifo_tx_data,
 		usedw		=> fifo_tx_count
 	);
 
 	-- parallel to serial converter
-	process(p2s_state_reg, p2s_transmit_reg,p2s_shift_reg,fifo_tx_data,fifo_tx_empty,transmit_enable)
+	process(p2s_state_reg, p2s_transmit_reg,p2s_shift_reg,fifo_tx_data,fifo_tx_empty_int,transmit_enable)
 	begin
 		p2s_state_next <= p2s_state_reg;
 		p2s_transmit_next <= p2s_transmit_reg;
@@ -361,8 +365,8 @@ transmit_fifo : work.fifo_transmit
 			p2s_shift_next <= '1'&p2s_shift_reg(7 downto 1);
 			case p2s_state_reg is
 				when P2S_STATE_WAIT =>
-					p2s_idle <= fifo_tx_empty;
-					if fifo_tx_empty='0' then
+					p2s_idle <= fifo_tx_empty_int;
+					if fifo_tx_empty_int='0' then
 						p2s_state_next <= P2S_STATE_SHIFT_0;
 						fifo_tx_advance <= '1';
 						p2s_shift_next <= fifo_tx_data; -- already valid (depends on fifo type: todo)
@@ -415,7 +419,7 @@ transmit_fifo : work.fifo_transmit
 --		DataIn => sio_command&s2p_data,
 --		ReadEn => fifo_rx_advance,
 --		DataOut => fifo_rx_data,
---		Empty => fifo_rx_empty,
+--		Empty => fifo_rx_empty_int,
 --		Full => fifo_rx_full
 --	);
 
@@ -431,7 +435,7 @@ receive_fifo : entity work.fifo_receive
 		data		=> sio_command_count_reg&sio_data_out_reg&s2p_shift_reg(6 downto 0),
 		rdreq		=> fifo_rx_advance,
 		wrreq		=> receive_write,
-		empty		=> fifo_rx_empty,
+		empty		=> fifo_rx_empty_int,
 		full		=> fifo_rx_full,
 		q		=> fifo_rx_data,
 		usedw		=> fifo_rx_count
@@ -498,6 +502,8 @@ receive_fifo : entity work.fifo_receive
 	-- output
 	sio_data_in <= p2s_transmit_reg;
 	data_out <= data_out_reg;
+	fifo_tx_empty <= fifo_tx_empty_int;
+	fifo_rx_empty <= fifo_rx_empty_int;
 
 end vhdl;
 
