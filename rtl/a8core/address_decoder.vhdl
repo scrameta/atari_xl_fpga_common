@@ -433,9 +433,10 @@ BEGIN
 					addr_next <= DMA_ADDR;
 					data_WRITE_next <= DMA_WRITE_DATA;
 
-					width_8bit_next <= DMA_8BIT_WRITE_ENABLE or (DMA_READ_ENABLE and (DMA_addr(0) or DMA_addr(1)));
+					-- DO NOT MERGE TODO FIXME 
+					width_8bit_next <= DMA_8BIT_WRITE_ENABLE; -- or (DMA_READ_ENABLE and (DMA_addr(0) or DMA_addr(1)));
 					width_16bit_next <= DMA_16BIT_WRITE_ENABLE;
-					width_32bit_next <= DMA_32BIT_WRITE_ENABLE or (DMA_READ_ENABLE and not(DMA_addr(0) or DMA_addr(1))); -- narrower devices just return 8 bits on read
+					width_32bit_next <= DMA_32BIT_WRITE_ENABLE; -- or (DMA_READ_ENABLE and not(DMA_addr(0) or DMA_addr(1))); -- narrower devices just return 8 bits on read
 					
 					write_enable_next <= not(DMA_READ_ENABLE);
 					write_enable_freezer_next <= not(DMA_READ_ENABLE);
